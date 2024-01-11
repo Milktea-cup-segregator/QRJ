@@ -1,57 +1,69 @@
-import numpy as np
+import RPi.GPIO as GPIO
 import pyaudio
-import math
+import numpy as np
+import wave
 
+# 设置GPIO编码方式为BOARD
+GPIO.setmode(GPIO.BOARD)
 
-# 定义声音输入参数
-chunk = 1024
-format = pyaudio.paInt16
-channels = 1
-rate = 44100
+# 定义LED引脚 (这里使用第12号引脚)
+led_pin = 12
 
-# 初始化音频输入
-p = pyaudio.PyAudio()
-stream = p.open(format=format, channels=channels, rate=rate, input=True, frames_per_buffer=chunk)
+# 设置LED引脚为输出
+GPIO.setup(led_pin, GPIO.OUT)
 
-# 循环获取音频输入并闪烁 LED
-previous_frequency = 0
-while True:
-        # 读取音频输入数据
-    data = stream.read(chunk)
-        # 将音频数据转换为numpy数组
-    audio = np.frombuffer(data, dtype=np.int16)
-        # 进行傅里叶变换
-    freq_spectrum = np.fft.fft(audio)
-        # 计算频谱的幅度谱（频率强度）
-    magnitude_spectrum = np.abs(freq_spectrum)
-        # 寻找最显著的频率
-    dominant_frequency = np.argmax(magnitude_spectrum)
-    frequency = dominant_frequency * rate / chunk
-    print("Dominant Frequency:", frequency, "Hz")
-    sound_intensity = magnitude_spectrum[dominant_frequency]
-    reference_intensity = 1.0  # 参考幅度
-    sound_intensity_db = 20 * math.log10(sound_intensity / reference_intensity)
-    print("Sound Intensity at Dominant Frequency:", sound_intensity_db, "dB")
+# 创建PWM对象，频率为100Hz
+pwm = GPIO.PWM(led_pin, 100)
 
-        # 输出特征频率
-        # print("Feature Frequency:", feature_frequency)
+# 启动PWM，并设置初始占空比为0%
+pwm.start(0)
 
-        # 设置阈值
-    threshold = 1000
+# 设置音频参数
+CHUNK = 1024
+FORMAT = pyaudio.paInt16
+CHANNELS = 1
+RATE = 44100
 
-    if magnitude_spectrum[dominant_frequency] > threshold:
+def record_audio():
+    stream = pyaudio.PyAudio().open(format=FORMAT,
+                                channels=CHANNELS,
+                                rate=RATE,
+                                input=True,
+                                frames_per_buffer=CHUNK)
+    
+    print("开始录音...")
+    
+    frames = []
+    
+    # 录制音频并将数据存储在frames列表中
+    while True:
+        data = stream.read(CHUNK)
+        frames.append(data)
+        # 将输入数据转换为numpy数组
+        audio_data = np.frombuffer(data, dtype=np.int16)
+        # 计算音频的平均值
+        avg = np.average(np.abs(audio_data))
+        # 使LED闪烁的亮度取决于音频平均值
+        duty_cycle = int(avg / 32767 * 100)
+        pwm.ChangeDutyCycle(duty_cycle)
+    
+    print("录音结束...")
+    
+    # 停止PWM
+    pwm.stop()
+    
+    # 清理GPIO设置
+    GPIO.cleanup()
+    
+    # 将录制的音频写入到WAV文件中
+    wf = wave.open("recording.wav", "wb")
+    wf.setnchannels(CHANNELS)
+    wf.setsampwidth(pyaudio.PyAudio().get_sample_size(FORMAT))
+    wf.setframerate(RATE)
+    wf.writeframes(b"".join(frames))
+    wf.close()
 
-        print("light")
-    else:
-
-        print("dark")
-    if dominant_frequency > previous_frequency:
-            # 将索引值转换为实际频率
-        frequency = dominant_frequency * rate / chunk
-        print("Dominant Frequency:", frequency, "Hz")
-        previous_frequency = dominant_frequency
-
-
-stream.stop_stream()
-stream.close()
-p.terminate()
+try:
+    record_audio()
+except KeyboardInterrupt:
+    pass
