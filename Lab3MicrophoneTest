@@ -1,0 +1,57 @@
+import numpy as np
+import pyaudio
+import math
+
+
+# 定义声音输入参数
+chunk = 1024
+format = pyaudio.paInt16
+channels = 1
+rate = 44100
+
+# 初始化音频输入
+p = pyaudio.PyAudio()
+stream = p.open(format=format, channels=channels, rate=rate, input=True, frames_per_buffer=chunk)
+
+# 循环获取音频输入并闪烁 LED
+previous_frequency = 0
+while True:
+        # 读取音频输入数据
+    data = stream.read(chunk)
+        # 将音频数据转换为numpy数组
+    audio = np.frombuffer(data, dtype=np.int16)
+        # 进行傅里叶变换
+    freq_spectrum = np.fft.fft(audio)
+        # 计算频谱的幅度谱（频率强度）
+    magnitude_spectrum = np.abs(freq_spectrum)
+        # 寻找最显著的频率
+    dominant_frequency = np.argmax(magnitude_spectrum)
+    frequency = dominant_frequency * rate / chunk
+    print("Dominant Frequency:", frequency, "Hz")
+    sound_intensity = magnitude_spectrum[dominant_frequency]
+    reference_intensity = 1.0  # 参考幅度
+    sound_intensity_db = 20 * math.log10(sound_intensity / reference_intensity)
+    print("Sound Intensity at Dominant Frequency:", sound_intensity_db, "dB")
+
+        # 输出特征频率
+        # print("Feature Frequency:", feature_frequency)
+
+        # 设置阈值
+    threshold = 1000
+
+    if magnitude_spectrum[dominant_frequency] > threshold:
+
+        print("light")
+    else:
+
+        print("dark")
+    if dominant_frequency > previous_frequency:
+            # 将索引值转换为实际频率
+        frequency = dominant_frequency * rate / chunk
+        print("Dominant Frequency:", frequency, "Hz")
+        previous_frequency = dominant_frequency
+
+
+stream.stop_stream()
+stream.close()
+p.terminate()
