@@ -1,0 +1,64 @@
+import RPi.GPIO as GPIO
+import time
+
+# 设置GPIO模式为BCM
+GPIO.setmode(GPIO.BCM)
+
+# 定义引脚
+ENA = 13    # 电机使能引脚
+IN1 = 5     # 电机输入1引脚
+IN2 = 6     # 电机输入2引脚
+ENB = 26    # 电机使能引脚
+IN3 = 19    # 电机输入3引脚
+IN4 = 16    # 电机输入4引脚
+
+# 设置GPIO引脚作为输出
+GPIO.setup(ENA, GPIO.OUT)
+GPIO.setup(IN1, GPIO.OUT)
+GPIO.setup(IN2, GPIO.OUT)
+GPIO.setup(ENB, GPIO.OUT)
+GPIO.setup(IN3, GPIO.OUT)
+GPIO.setup(IN4, GPIO.OUT)
+
+# 创建PWM对象，设置频率和初始占空比
+pwmA = GPIO.PWM(ENA, 1000)
+pwmB = GPIO.PWM(ENB, 1000)
+pwmA.start(0)
+pwmB.start(0)
+
+# 定义电机控制函数
+def motor_control(s, d):
+    if d == 'F':
+        GPIO.output(IN1, GPIO.HIGH)
+        GPIO.output(IN2, GPIO.LOW)
+        GPIO.output(IN3, GPIO.HIGH)
+        GPIO.output(IN4, GPIO.LOW)
+    elif d == 'B':
+        GPIO.output(IN1, GPIO.LOW)
+        GPIO.output(IN2, GPIO.HIGH)
+        GPIO.output(IN3, GPIO.LOW)
+        GPIO.output(IN4, GPIO.HIGH)
+
+    # 限制s的范围为0到100
+    s = max(0, min(100, s))
+    pwmA.ChangeDutyCycle(s)
+    pwmB.ChangeDutyCycle(s)
+
+# 获取用户输入的转速和方向
+while True:
+    speed_str = input("请输入转速(0-100): ")
+    direction_str = input("请输入方向(F/B): ")
+
+    try:
+        speed = int(speed_str)
+        if speed < 0 or speed > 100:
+            raise ValueError
+        direction = direction_str.upper()
+        if direction != 'F' and direction != 'B':
+            raise ValueError
+
+        # 控制电机转速和方向
+        motor_control(speed, direction)
+
+    except ValueError:
+        print("输入有误，请重新输入转速(0-100)和方向(F/B)")
