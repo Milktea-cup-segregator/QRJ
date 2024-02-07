@@ -1,0 +1,36 @@
+import RPi.GPIO as GPIO
+import alsaaudio
+import audioop
+import subprocess
+
+# 创建声音捕捉对象
+microphone = alsaaudio.PCM(alsaaudio.PCM_CAPTURE)
+microphone.setchannels(1)
+microphone.setrate(44100)
+microphone.setformat(alsaaudio.PCM_FORMAT_S16_LE)
+microphone.setperiodsize(1024)
+
+# 定义声音阈值
+SOUND_THRESHOLD = 5000    # 根据麦克风采样率和声音强度进行调整
+
+# 定义音乐文件路径
+MUSIC_FILE = "TestAudio.mp3"
+
+# 定义播放音乐的函数
+def play_music():
+    subprocess.Popen(["omxplayer", MUSIC_FILE], stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                     stderr=subprocess.PIPE, close_fds=True, universal_newlines=True)
+
+# 检测声音强度并播放音乐
+try:
+    while True:
+        # 读取声音样本
+        _, sample = microphone.read()
+        # 计算声音强度
+        rms = audioop.rms(sample, 2)
+        # 如果声音强度超过阈值，则播放音乐
+        if rms >= SOUND_THRESHOLD:
+            play_music()
+
+except KeyboardInterrupt:
+    pass
